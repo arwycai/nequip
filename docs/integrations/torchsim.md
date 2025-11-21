@@ -35,7 +35,7 @@ To use a NequIP framework model with torch-sim:
 3. **Create the torch-sim calculator**: Build a {class}`~nequip.integrations.torchsim.NequIPTorchSimCalc` from the compiled model file:
 
 ```python
-from nequip.integrations import NequIPTorchSimCalc
+from nequip.integrations.torchsim import NequIPTorchSimCalc
 
 calculator = NequIPTorchSimCalc.from_compiled_model(
     compile_path="path/to/compiled_model.nequip.pt2",
@@ -86,7 +86,7 @@ The primary use case for torch-sim integration is efficient batched evaluation o
 import torch
 import torch_sim as ts
 from ase.build import bulk
-from nequip.integrations import NequIPTorchSimCalc
+from nequip.integrations.torchsim import NequIPTorchSimCalc
 
 # Initialize the calculator
 calculator = NequIPTorchSimCalc.from_compiled_model(

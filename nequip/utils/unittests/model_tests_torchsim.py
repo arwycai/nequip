@@ -27,7 +27,7 @@ from .model_tests_compilation import CompilationTestsMixin
 # === TorchSim availability check ===
 try:
     import torch_sim as ts
-    from nequip.integrations import NequIPTorchSimCalc
+    from nequip.integrations.torchsim import NequIPTorchSimCalc
 
     _TORCHSIM_INSTALLED = True
 except ImportError:

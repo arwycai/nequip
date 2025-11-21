@@ -9,6 +9,12 @@ Most recent change on the top.
 ## Unreleased
 
 
+## [0.16.1]
+
+### Fixed
+- Made torch-sim integration optional: removed `torchsim` import from `nequip.integrations.__init__.py` to prevent import errors when `torch_sim` is not installed. This allows other integration tools (e.g., `nequip-prepare-lmp-mliap`) to work without requiring `torch_sim` as a dependency.
+
+
 ## [0.16.0]
 
 ### Added
