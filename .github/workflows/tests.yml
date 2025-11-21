@@ -81,6 +81,10 @@ jobs:
           else
             echo "Skipping OpenEquivariance installation (torch < 2.7)"
           fi
+          # Pin numpy<2 and matscipy 1.1.1 for torch 2.2 to avoid compatibility issues
+          if [ "${{ matrix.torch-version }}" = "2.2.0" ]; then
+            pip install "numpy<2" "matscipy==1.1.1"
+          fi
           pip install --upgrade-strategy only-if-needed .
           pip install pytest pytest-xdist[psutil]
       - name: Test with pytest
