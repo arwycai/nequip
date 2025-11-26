@@ -833,10 +833,14 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
         if key == AtomicDataDict.EDGE_EMBEDDING_KEY:
             # we can only check that other edges are unaffected if we know it's an embedding
             # For example, an Allegro edge feature is many body so will be affected
-            assert torch.allclose(edge_embed[:2], edge_embed2[:2])
-        assert edge_embed[2:].abs().sum() > 1e-6  # some nonzero terms
-        assert torch.allclose(
-            edge_embed2[2:], torch.zeros(1, device=device, dtype=edge_embed2.dtype)
+            torch.testing.assert_close(edge_embed[:2], edge_embed2[:2])
+        assert edge_embed[2:].abs().sum() > 1e-6, (
+            f"Edge embeddings at cutoff should have some nonzero terms before moving atom to cutoff, "
+            f"but got sum of absolute values: {edge_embed[2:].abs().sum()}"
+        )
+        torch.testing.assert_close(
+            edge_embed2[2:],
+            torch.zeros_like(edge_embed2[2:]),
         )
 
         # test gradients
@@ -852,8 +856,9 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                 inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
                 retain_graph=True,
             )[0]
-            assert torch.allclose(
-                grads, torch.zeros(1, device=device, dtype=grads.dtype)
+            torch.testing.assert_close(
+                grads,
+                torch.zeros_like(grads),
             )
 
             if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
@@ -862,7 +867,11 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                     outputs=out[AtomicDataDict.PER_ATOM_ENERGY_KEY][:2].sum(),
                     inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
                 )[0]
-                print(grads)
                 # only care about gradient wrt moved atom
-                assert grads.shape == (3, 3)
-                assert torch.allclose(grads[2], torch.zeros(1, device=device))
+                assert grads.shape == (3, 3), (
+                    f"Expected gradient shape (3, 3) for 3 atoms in 3D, got {grads.shape}"
+                )
+                torch.testing.assert_close(
+                    grads[2],
+                    torch.zeros_like(grads[2]),
+                )
