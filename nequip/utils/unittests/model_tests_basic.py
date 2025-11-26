@@ -383,6 +383,36 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
     - Isolated atom energy shifts
     """
 
+    def total_energy_keys(self):
+        """Return list of total energy keys to test.
+
+        Subclasses can override to test multiple energy keys (e.g., energy_0, energy_1).
+
+        Returns:
+            List of total energy key strings
+        """
+        return [AtomicDataDict.TOTAL_ENERGY_KEY]
+
+    def per_atom_energy_keys(self):
+        """Return list of per-atom energy keys to test.
+
+        Subclasses can override to test multiple energy keys (e.g., per_atom_energy_0, per_atom_energy_1).
+
+        Returns:
+            List of per-atom energy key strings
+        """
+        return [AtomicDataDict.PER_ATOM_ENERGY_KEY]
+
+    def force_keys(self):
+        """Return list of force keys to test.
+
+        Subclasses can override to test multiple force keys (e.g., force_0, force_1).
+
+        Returns:
+            List of force key strings
+        """
+        return [AtomicDataDict.FORCE_KEY]
+
     def test_large_separation(self, model, molecules, device):
         instance, config, _ = model
         atol = {torch.float32: 1e-4, torch.float64: 1e-10}[instance.model_dtype]
@@ -422,22 +452,27 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
         out2 = instance(from_dict(data2))
         out_both = instance(from_dict(data_both))
 
-        assert torch.allclose(
-            out1[AtomicDataDict.TOTAL_ENERGY_KEY]
-            + out2[AtomicDataDict.TOTAL_ENERGY_KEY],
-            out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
-            atol=atol,
-        )
-        if AtomicDataDict.FORCE_KEY in out1:
-            # check forces if it's a force model
-            assert torch.allclose(
-                torch.cat(
-                    (out1[AtomicDataDict.FORCE_KEY], out2[AtomicDataDict.FORCE_KEY]),
-                    dim=0,
-                ),
-                out_both[AtomicDataDict.FORCE_KEY],
-                atol=atol,
-            )
+        # test all total energy keys
+        for energy_key in self.total_energy_keys():
+            if energy_key in out1 and energy_key in out2 and energy_key in out_both:
+                assert torch.allclose(
+                    out1[energy_key] + out2[energy_key],
+                    out_both[energy_key],
+                    atol=atol,
+                ), f"Large separation test failed for {energy_key}"
+
+        # test all force keys
+        for force_key in self.force_keys():
+            if force_key in out1:
+                # check forces if it's a force model
+                assert torch.allclose(
+                    torch.cat(
+                        (out1[force_key], out2[force_key]),
+                        dim=0,
+                    ),
+                    out_both[force_key],
+                    atol=atol,
+                ), f"Large separation test failed for {force_key}"
 
         atoms_both2 = atoms1.copy()
         atoms3 = atoms2.copy()
@@ -450,16 +485,24 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
         )
 
         out_both2 = instance(data_both2)
-        assert torch.allclose(
-            out_both2[AtomicDataDict.TOTAL_ENERGY_KEY],
-            out_both[AtomicDataDict.TOTAL_ENERGY_KEY],
-            atol=atol,
-        )
-        assert torch.allclose(
-            out_both2[AtomicDataDict.PER_ATOM_ENERGY_KEY],
-            out_both[AtomicDataDict.PER_ATOM_ENERGY_KEY],
-            atol=atol,
-        )
+
+        # test total energy invariance to rigid translation
+        for energy_key in self.total_energy_keys():
+            if energy_key in out_both and energy_key in out_both2:
+                assert torch.allclose(
+                    out_both2[energy_key],
+                    out_both[energy_key],
+                    atol=atol,
+                ), f"Translation invariance test failed for {energy_key}"
+
+        # test per-atom energy invariance to rigid translation
+        for per_atom_energy_key in self.per_atom_energy_keys():
+            if per_atom_energy_key in out_both and per_atom_energy_key in out_both2:
+                assert torch.allclose(
+                    out_both2[per_atom_energy_key],
+                    out_both[per_atom_energy_key],
+                    atol=atol,
+                ), f"Translation invariance test failed for {per_atom_energy_key}"
 
     def test_cross_frame_grad(self, model, device, nequip_dataset):
         batch = AtomicDataDict.batched_from_list(
@@ -470,67 +513,71 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
         data[AtomicDataDict.POSITIONS_KEY].requires_grad = True
 
         output = energy_model(data)
-        grads = torch.autograd.grad(
-            outputs=output[AtomicDataDict.TOTAL_ENERGY_KEY][-1],
-            inputs=data[AtomicDataDict.POSITIONS_KEY],
-            allow_unused=True,
-        )[0]
 
-        last_frame_n_atom = batch[AtomicDataDict.NUM_NODES_KEY][-1]
+        # test cross-frame gradient isolation for all total energy keys
+        for energy_key in self.total_energy_keys():
+            if energy_key in output:
+                grads = torch.autograd.grad(
+                    outputs=output[energy_key][-1],
+                    inputs=data[AtomicDataDict.POSITIONS_KEY],
+                    allow_unused=True,
+                    retain_graph=True,
+                )[0]
 
-        in_frame_grad = grads[-last_frame_n_atom:]
-        cross_frame_grad = grads[:-last_frame_n_atom]
+                last_frame_n_atom = batch[AtomicDataDict.NUM_NODES_KEY][-1]
 
-        assert cross_frame_grad.abs().max().item() == 0
-        assert in_frame_grad.abs().max().item() > 0
+                in_frame_grad = grads[-last_frame_n_atom:]
+                cross_frame_grad = grads[:-last_frame_n_atom]
+
+                assert cross_frame_grad.abs().max().item() == 0, (
+                    f"Cross-frame gradient test failed for {energy_key}"
+                )
+                assert in_frame_grad.abs().max().item() > 0, (
+                    f"In-frame gradient test failed for {energy_key}"
+                )
 
     def test_numeric_gradient(self, model, atomic_batch, device):
         """
         Tests the ForceStressOutput model by comparing numerical gradients of the forces to the analytical gradients.
         """
         model, _, out_fields = model
-        # proceed with tests only if forces are available
-        if AtomicDataDict.FORCE_KEY in out_fields:
-            # physical predictions (energy, forces, etc) will be converted to default_dtype (float64) before comparing
-            data = AtomicDataDict.to_(atomic_batch, device)
-            output = model(data)
-            forces = output[AtomicDataDict.FORCE_KEY]
-            epsilon = 1e-3
 
-            # Compute numerical gradients for each atom and direction and compare to analytical gradients
-            for iatom in range(len(data[AtomicDataDict.POSITIONS_KEY])):
-                for idir in range(3):
-                    # Shift `iatom` an `epsilon` in the `idir` direction
-                    pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
-                    data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
-                    output = model(data)
-                    e_plus = (
-                        output[AtomicDataDict.TOTAL_ENERGY_KEY]
-                        .sum()
-                        .to(torch.get_default_dtype())
-                    )
+        # test numeric gradients for each pair of (total_energy_key, force_key)
+        for energy_key, force_key in zip(self.total_energy_keys(), self.force_keys()):
+            # proceed with tests only if forces are available
+            if force_key in out_fields:
+                # physical predictions (energy, forces, etc) will be converted to default_dtype (float64) before comparing
+                data = AtomicDataDict.to_(atomic_batch, device)
+                output = model(data)
+                forces = output[force_key]
+                epsilon = 1e-3
 
-                    # Shift `iatom` an `epsilon` in the negative `idir` direction
-                    data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
-                    output = model(data)
-                    e_minus = (
-                        output[AtomicDataDict.TOTAL_ENERGY_KEY]
-                        .sum()
-                        .to(torch.get_default_dtype())
-                    )
+                # compute numerical gradients for each atom and direction and compare to analytical gradients
+                for iatom in range(len(data[AtomicDataDict.POSITIONS_KEY])):
+                    for idir in range(3):
+                        # shift `iatom` an `epsilon` in the `idir` direction
+                        pos = data[AtomicDataDict.POSITIONS_KEY][iatom, idir]
+                        data[AtomicDataDict.POSITIONS_KEY][iatom, idir] = pos + epsilon
+                        output = model(data)
+                        e_plus = output[energy_key].sum().to(torch.get_default_dtype())
 
-                    # Symmetric difference to get the partial forces to all the atoms
-                    numeric = -(e_plus - e_minus) / (epsilon * 2)
-                    analytical = forces[iatom, idir].to(torch.get_default_dtype())
+                        # shift `iatom` an `epsilon` in the negative `idir` direction
+                        data[AtomicDataDict.POSITIONS_KEY][iatom, idir] -= epsilon * 2
+                        output = model(data)
+                        e_minus = output[energy_key].sum().to(torch.get_default_dtype())
 
-                    assert torch.isclose(
-                        numeric, analytical, atol=2e-2
-                    ) or torch.isclose(numeric, analytical, rtol=5e-3), (
-                        f"numeric: {numeric.item()}, analytical: {analytical.item()}"
-                    )
+                        # symmetric difference to get the partial forces to all the atoms
+                        numeric = -(e_plus - e_minus) / (epsilon * 2)
+                        analytical = forces[iatom, idir].to(torch.get_default_dtype())
 
-                    # Reset the position
-                    data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
+                        assert torch.isclose(
+                            numeric, analytical, atol=2e-2
+                        ) or torch.isclose(numeric, analytical, rtol=5e-3), (
+                            f"numeric: {numeric.item()}, analytical: {analytical.item()} for {energy_key}/{force_key}"
+                        )
+
+                        # reset the position
+                        data[AtomicDataDict.POSITIONS_KEY][iatom, idir] += epsilon
 
     def test_partial_forces(
         self, model, partial_model, atomic_batch, device, strict_locality
@@ -802,10 +849,15 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                     ),
                     device,
                 )
-                energies = instance(data)[AtomicDataDict.TOTAL_ENERGY_KEY]
-                assert torch.allclose(
-                    energies, scale_shift_module.shifts.reshape(energies.shape)
-                )
+                output = instance(data)
+
+                # test isolated atom energies for all total energy keys
+                for energy_key in self.total_energy_keys():
+                    if energy_key in output:
+                        energies = output[energy_key]
+                        assert torch.allclose(
+                            energies, scale_shift_module.shifts.reshape(energies.shape)
+                        ), f"Isolated atom energy test failed for {energy_key}"
 
     def test_embedding_cutoff(self, model, device):
         """Test that edge embeddings/features go to zero at cutoff and gradients are correct."""
@@ -861,17 +913,20 @@ class EnergyModelTestsMixin(BasicModelTestsMixin):
                 torch.zeros_like(grads),
             )
 
-            if AtomicDataDict.PER_ATOM_ENERGY_KEY in out:
-                # are the first two atom's energies unaffected by atom at the cutoff?
-                grads = torch.autograd.grad(
-                    outputs=out[AtomicDataDict.PER_ATOM_ENERGY_KEY][:2].sum(),
-                    inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
-                )[0]
-                # only care about gradient wrt moved atom
-                assert grads.shape == (3, 3), (
-                    f"Expected gradient shape (3, 3) for 3 atoms in 3D, got {grads.shape}"
-                )
-                torch.testing.assert_close(
-                    grads[2],
-                    torch.zeros_like(grads[2]),
-                )
+            # test that first two atoms' energies are unaffected by atom at cutoff
+            for per_atom_energy_key in self.per_atom_energy_keys():
+                if per_atom_energy_key in out:
+                    # are the first two atom's energies unaffected by atom at the cutoff?
+                    grads = torch.autograd.grad(
+                        outputs=out[per_atom_energy_key][:2].sum(),
+                        inputs=in_dict[AtomicDataDict.POSITIONS_KEY],
+                        retain_graph=True,
+                    )[0]
+                    # only care about gradient wrt moved atom
+                    assert grads.shape == (3, 3), (
+                        f"Expected gradient shape (3, 3) for 3 atoms in 3D, got {grads.shape}"
+                    )
+                    torch.testing.assert_close(
+                        grads[2],
+                        torch.zeros_like(grads[2]),
+                    )
