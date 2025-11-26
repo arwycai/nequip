@@ -363,7 +363,15 @@ class NequIPTorchSimCalc(ModelInterface):
             if stress is not None:
                 results["stress"] = stress.detach()
 
+        self.save_extra_outputs(out, results)
+
         return results
+
+    def save_extra_outputs(
+        self, out: dict[str, torch.Tensor], results: dict[str, torch.Tensor]
+    ) -> None:
+        # subclasses can implement this method to process extra outputs without code duplication
+        pass
 
 
 def _basic_transforms(
