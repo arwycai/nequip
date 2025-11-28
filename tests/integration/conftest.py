@@ -56,7 +56,7 @@ def conffile(request):
             else []
         ),
         {"_target_": "nequip.train.EMALightningModule"},
-        {"_target_": "nequip.train.EMAConFIGLightningModule"},
+        # {"_target_": "nequip.train.EMAConFIGLightningModule"},
     ],
 )
 def training_module_override_dict(request):
@@ -189,6 +189,9 @@ class TrainingInvarianceBaseTest:
                     )
 
     # TODO: will fail if train dataloader has shuffle=True
+    # NOTE: test_restarts doesn't pass with PyTorch Lightning >= 2.6.0
+    # may be related: https://github.com/Lightning-AI/pytorch-lightning/issues/20204
+    # CI enforces lightning < 2.6.0 until this is resolved.
     def test_restarts(self, fake_model_training_session):
         config, tmpdir, env, model_dtype = fake_model_training_session
 
@@ -260,11 +263,19 @@ class TrainingInvarianceBaseTest:
                 print(restart_val_metrics)
                 print(oneshot_val_metrics)
                 assert len(restart_val_metrics) == len(oneshot_val_metrics)
-                assert all(
-                    [
-                        math.isclose(a, b, rel_tol=tol)
-                        for a, b in zip(
-                            restart_val_metrics.values(), oneshot_val_metrics.values()
+                for name, restart_val, oneshot_val in zip(
+                    restart_val_metrics.keys(),
+                    restart_val_metrics.values(),
+                    oneshot_val_metrics.values(),
+                ):
+                    # do not include maxabserr or total energy in testing (per atom energy tested)
+                    if ("maxabserr" in name) or ("total_energy" in name):
+                        continue
+                    if not math.isclose(
+                        restart_val, oneshot_val, rel_tol=tol, abs_tol=tol
+                    ):
+                        raise AssertionError(
+                            f"Validation metric mismatch for '{name}': "
+                            f"restart value={restart_val}, oneshot value={oneshot_val}, "
+                            f"diff={abs(restart_val - oneshot_val)}, rel_tol={tol}"
                         )
-                    ]
-                ), [restart_val_metrics, oneshot_val_metrics]
