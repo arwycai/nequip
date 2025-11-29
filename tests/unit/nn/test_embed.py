@@ -36,4 +36,5 @@ def test_radial_basis(model_dtype, CH3CHO):
         gm = GraphModel(rad)
     assert_auto_jitable(rad.edge_norm)
     assert_auto_jitable(rad.bessel)
-    assert_AtomicData_equivariant(gm, data)
+    tol = {"float32": 1e-5, "float64": 1e-9}[model_dtype]
+    assert_AtomicData_equivariant(gm, data, e3_tolerance=tol)
