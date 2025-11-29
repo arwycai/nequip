@@ -80,6 +80,10 @@ class TestNequIPModel(TorchSimIntegrationMixin, LAMMPSMLIAPIntegrationMixin):
     def strict_locality(self):
         return False
 
+    @pytest.fixture(scope="class")
+    def equivariance_tol(self, model_dtype):
+        return {"float32": 5e-5, "float64": 1e-7}[model_dtype]
+
     @pytest.fixture(
         params=[
             minimal_config1,
