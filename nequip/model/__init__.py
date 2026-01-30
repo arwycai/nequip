@@ -6,7 +6,7 @@ from .saved_models import (
     ModelFromPackage,
     ModelTypeNamesFromPackage,
 )
-from .nequip_models import NequIPGNNModel, FullNequIPGNNModel
+from .nequip_models import NequIPGNNModel, FullNequIPGNNModel, NequIPGNNModelOG, FullNequIPGNNModelOG
 from .pair_potential import ZBLPairPotential
 
 __all__ = [
@@ -18,5 +18,7 @@ __all__ = [
     "ModelTypeNamesFromPackage",
     "NequIPGNNModel",
     "FullNequIPGNNModel",
+    "NequIPGNNModelOG",
+    "FullNequIPGNNModelOG",
     "ZBLPairPotential",
 ]

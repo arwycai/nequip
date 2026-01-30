@@ -102,13 +102,13 @@ def main(config: DictConfig) -> None:
 
     # === initialize global state ===
     set_global_state()
-
+    
     # === instantiate datamodule ===
     logger.info("Building datamodule ...")
     data = OmegaConf.to_container(config.data, resolve=True)
     datamodule = instantiate(data, _recursive_=False)
     assert isinstance(datamodule, NequIPDataModule)
-
+    
     # === instantiate Lightning.Trainer ===
     trainer_cfg = OmegaConf.to_container(config.trainer, resolve=True)
     # enforce inference_mode=False to enable grad during inference
@@ -118,11 +118,11 @@ def main(config: DictConfig) -> None:
             "`inference_mode` found in train.trainer in the config -- users shouldn't set this. NequIP will set `inference_mode=False`."
         )
     trainer = instantiate(trainer_cfg, inference_mode=False)
-
+    
     # === instantiate NequIPLightningModule (including model) ===
     training_module = hydra.utils.get_class(config.training_module._target_)
     assert issubclass(training_module, NequIPLightningModule)
-
+    
     # assemble various dicts to be saved by the NequIPLightningModule
     info_dict = {
         "versions": versions,
@@ -131,7 +131,7 @@ def main(config: DictConfig) -> None:
         "global_options": get_latest_global_state(),
         "runs": runs,
     }
-
+    
     # `run_index` is used to restore the run stage from a checkpoint if restarting from one
     run_index = 0
     if "ckpt_path" in config:
@@ -209,7 +209,7 @@ def main(config: DictConfig) -> None:
 
         # === instantiate training module ===
         logger.info("Building model and training_module from scratch ...")
-
+        
         nequip_module = instantiate(
             nequip_module_cfg,
             # ensure lazy instantiation of lightning module attributes
@@ -219,7 +219,6 @@ def main(config: DictConfig) -> None:
             num_datasets=datamodule.num_datasets,
             info_dict=info_dict,
         )
-
     # pass world size from trainer to NequIPLightningModule
     nequip_module.world_size = trainer.world_size
 
@@ -232,11 +231,13 @@ def main(config: DictConfig) -> None:
     while run_index < len(runs):
         run_type = runs[run_index]
         if run_type == "train":
+            print('success start train run')
             ckpt_path = config.get("ckpt_path", None)
             logger.info("TRAIN RUN START")
             trainer.fit(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)
             ckpt_path = "best"
             logger.info("TRAIN RUN END")
+            print('success end train run')
         elif run_type == "val":
             logger.info("VAL RUN START")
             trainer.validate(nequip_module, datamodule=datamodule, ckpt_path=ckpt_path)

@@ -10,9 +10,9 @@ from .atomwise import (
 from .nonlinearities import ShiftedSoftplus
 from .mlp import ScalarMLP, ScalarMLPFunction
 from .interaction_block import InteractionBlock
-from .convnetlayer import ConvNetLayer
+from .convnetlayer import ConvNetLayer, ConvNetLayer_mod
 from .grad_output import PartialForceOutput, ForceStressOutput
-from .misc import Concat, ApplyFactor, SaveForOutput
+from .misc import Concat, ApplyFactor, SaveForOutput, SplitOutput
 from .utils import scatter, tp_path_exists, with_edge_vectors_, with_edge_type_
 from .model_modifier_utils import model_modifier, replace_submodules
 from .norm import AvgNumNeighborsNorm
@@ -32,7 +32,9 @@ __all__ = [
     "PartialForceOutput",
     "ForceStressOutput",
     "ConvNetLayer",
+    "ConvNetLayer_mod",
     "Concat",
+    "SplitOutput"
     "ApplyFactor",
     "SaveForOutput",
     "scatter",

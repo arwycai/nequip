@@ -2,17 +2,21 @@
 from .node import NodeTypeEmbed
 from ._edge import (
     EdgeLengthNormalizer,
+    EdgeLengthNormalizer_mod,
     BesselEdgeLengthEncoding,
     SphericalHarmonicEdgeAttrs,
     AddRadialCutoffToData,
 )
 from .cutoffs import PolynomialCutoff
+from .edge_type_embed import EdgeTypeEmbed
 
 __all__ = [
     NodeTypeEmbed,
     EdgeLengthNormalizer,
+    EdgeLengthNormalizer_mod,
     BesselEdgeLengthEncoding,
     SphericalHarmonicEdgeAttrs,
     AddRadialCutoffToData,
     PolynomialCutoff,
+    EdgeTypeEmbed,
 ]

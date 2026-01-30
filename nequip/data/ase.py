@@ -12,8 +12,167 @@ from ase.stress import full_3x3_to_voigt_6_stress, voigt_6_to_full_3x3_stress
 
 from . import AtomicDataDict, _key_registry
 from .dict import from_dict
+from .custom_bond_attr import dict_to_edge_attr
 
 from typing import Dict, Union, List, Optional
+
+def from_ase_withbond(
+    atoms: ase.Atoms,
+    bond_dict: Dict[str,any],
+    key_mapping: Optional[Dict[str, str]] = {},
+    include_keys: Optional[List] = [],
+    exclude_keys: Optional[List] = [],
+) -> AtomicDataDict.Type:
+    """Build an ``AtomicDataDict`` from an ``ase.Atoms`` object.
+
+    Respects ``atoms``'s ``pbc`` and ``cell``.
+
+    First tries to extract energies and forces from a single-point calculator associated with the ``Atoms`` if one is present and has those fields.
+    If either is not found, the method will look for ``energy``/``energies`` and ``force``/``forces`` in ``atoms.arrays``.
+
+    Args:
+        atoms (ase.Atoms): the input.
+        key_mapping (Optional[Dict]): rename ase property name to a new string name.
+        include_keys (Optional[List]): list of additional keys to include in AtomicData aside from the ones defined in ``ase.calculators.calculator.all_properties``
+        exclude_keys (Optional[List]): list of keys that may be present in the ``ase.Atoms`` object but the user wishes to exclude
+    """
+
+    edge_keys = []
+    for key in include_keys:
+        if 'edge' in key:
+            edge_keys.append(key)
+    
+    include_keys = list(set(include_keys) - set(edge_keys))
+    default_args = set(
+        [
+            "numbers",
+            "positions",
+        ]  # ase internal names for position and atomic_numbers
+        + [
+            AtomicDataDict.PBC_KEY,
+            AtomicDataDict.CELL_KEY,
+            AtomicDataDict.POSITIONS_KEY,
+        ]  # arguments for from_dict method
+    )
+    include_keys = list(
+        set(list(include_keys) + ase_all_properties + list(key_mapping.keys()))
+        - default_args
+        - set(exclude_keys)
+    )
+
+    km = {
+        "forces": AtomicDataDict.FORCE_KEY,
+        "energy": AtomicDataDict.TOTAL_ENERGY_KEY,
+        "energies": AtomicDataDict.PER_ATOM_ENERGY_KEY,
+    }
+    km.update(key_mapping)
+    key_mapping = km
+
+    add_fields = {}
+
+    # Get info from atoms.arrays; lowest priority. copy first
+    add_fields = {
+        key_mapping.get(k, k): v for k, v in atoms.arrays.items() if k in include_keys
+    }
+
+    # Get info from atoms.info; second lowest priority.
+    add_fields.update(
+        {key_mapping.get(k, k): v for k, v in atoms.info.items() if k in include_keys}
+    )
+
+    if atoms.calc is not None:
+        if isinstance(atoms.calc, (SinglePointCalculator, SinglePointDFTCalculator)):
+            add_fields.update(
+                {
+                    key_mapping.get(k, k): deepcopy(v)
+                    for k, v in atoms.calc.results.items()
+                    if k in include_keys
+                }
+            )
+        # we just ignore the calculator otherwise
+        # this may not work if we need to load more complex information from some unknown calculator
+        # but we can fix it if/when that happens, which is hopefully never
+
+    # handle ase-specific formats for single frame (no batching yet)
+    for key, value in add_fields.items():
+        if isinstance(value, np.ndarray):
+            # handle ase cartesian tensor formats
+            if key in _key_registry._CARTESIAN_TENSOR_FIELDS:
+                if key in _key_registry._GRAPH_FIELDS:
+                    # graph tensors: stress, virial, polarizability
+                    if value.shape == (6,):  # voigt -> 3x3
+                        add_fields[key] = voigt_6_to_full_3x3_stress(value)
+                    elif value.shape == (9,):  # flat -> 3x3
+                        add_fields[key] = value.reshape(3, 3)
+                    # (3,3) stays as is
+                    # validate graph tensor is now (3, 3)
+                    assert add_fields[key].shape == (
+                        3,
+                        3,
+                    ), (
+                        f"graph cartesian tensor {key} should be (3, 3) after reshaping, got {add_fields[key].shape}"
+                    )
+                elif key in _key_registry._NODE_FIELDS:
+                    # node tensors: born charges per atom
+                    if (
+                        value.ndim == 2 and value.shape[1] == 9
+                    ):  # (N_atoms, 9) -> (N_atoms, 3, 3)
+                        add_fields[key] = value.reshape(value.shape[0], 3, 3)
+                    elif (
+                        value.ndim == 2 and value.shape[1] == 6
+                    ):  # (N_atoms, 6) voigt -> (N_atoms, 3, 3)
+                        add_fields[key] = np.stack(
+                            [voigt_6_to_full_3x3_stress(row) for row in value]
+                        )
+                    # validate node tensor is now (N_atoms, 3, 3)
+                    assert add_fields[key].ndim == 3 and add_fields[key].shape[1:] == (
+                        3,
+                        3,
+                    ), (
+                        f"node cartesian tensor {key} should be (N_atoms, 3, 3) after reshaping, got {add_fields[key].shape}"
+                    )
+
+            # add batch dimension for graph-level fields
+            if key in _key_registry._GRAPH_FIELDS:
+                add_fields[key] = np.expand_dims(add_fields[key], 0)
+                # validate graph field now has batch dimension
+                if key in _key_registry._CARTESIAN_TENSOR_FIELDS:
+                    assert add_fields[key].shape == (
+                        1,
+                        3,
+                        3,
+                    ), (
+                        f"graph cartesian tensor {key} should be (1, 3, 3) after adding batch dim, got {add_fields[key].shape}"
+                    )
+
+    # NOTE: if cell is not present, ASE defaults to (3, 3) matrix of zeros
+    # i.e.
+    # if cell is None:
+    #     cell = np.zeros((3, 3))
+    # self.set_cell(cell)
+
+    # c.f. https://gitlab.com/ase/ase/-/blob/master/ase/atoms.py?ref_type=heads#L114
+
+    data = {
+        AtomicDataDict.POSITIONS_KEY: atoms.positions,
+        AtomicDataDict.CELL_KEY: np.array(atoms.get_cell()),
+        AtomicDataDict.PBC_KEY: atoms.get_pbc(),
+        AtomicDataDict.ATOMIC_NUMBERS_KEY: atoms.get_atomic_numbers(),
+    }
+    data.update(**add_fields)
+    
+    #add custom field bond descriptor as dict (it will be transformed during transform stage)
+    edge_custom_fields={}
+    key_mapping_bond = {
+        'edge_density': AtomicDataDict.EDGE_DENSITY_KEY,
+        'edge_ellipticity': AtomicDataDict.EDGE_ELLIPTICITY_KEY,
+        'edge_softness': AtomicDataDict.EDGE_SOFTNESS_KEY
+    }
+    for key in edge_keys:
+        edge_custom_fields[key_mapping_bond[key]]=dict_to_edge_attr(bond_dict, key)
+    data.update(**edge_custom_fields)
+    
+    return from_dict(data)
 
 
 def from_ase(

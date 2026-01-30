@@ -25,6 +25,22 @@ class Concat(GraphModuleMixin, torch.nn.Module):
         data[self.out_field] = torch.cat([data[k] for k in self.in_fields], dim=-1)
         return data
 
+class SplitOutput(GraphModuleMixin, torch.nn.Module):
+    """Concatenate multiple fields into one."""
+
+    def __init__(self, in_field: str, out_field1: str, out_field2: str, irreps_in={}):
+        super().__init__()
+        self.in_field = in_field
+        self.out_field1 = out_field1
+        self.out_field2 = out_field2
+        self._init_irreps(irreps_in=irreps_in, required_irreps_in=[self.in_field])
+        self.irreps_out[self.out_field1] = Irreps([(1,(0,1))])
+        self.irreps_out[self.out_field2] = Irreps([(1,(0,1))])
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        data[self.out_field1] = data[self.in_field][:,0]
+        data[self.out_field2] = data[self.in_field][:,1]
+        return data
 
 class ApplyFactor(GraphModuleMixin, torch.nn.Module):
     """Applies factor to field."""

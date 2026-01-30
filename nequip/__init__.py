@@ -39,3 +39,13 @@ for ep in _DISCOVERED_NEQUIP_EXTENSION:
 
 # register OmegaConf resolvers
 _register_default_resolvers()
+
+
+
+
+#register custom fields
+from nequip.data import register_fields
+
+register_fields(
+    node_fields=["density","density_valence","laplacian","lap_valence","hess_eigen"]
+)

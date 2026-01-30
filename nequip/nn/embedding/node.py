@@ -41,6 +41,7 @@ class NodeTypeEmbed(GraphModuleMixin, torch.nn.Module):
         irreps_in={},
     ):
         super().__init__()
+
         # === bookkeeping ===
         self.num_types = len(type_names)
         self.set_features = set_features

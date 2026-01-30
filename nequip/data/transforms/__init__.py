@@ -14,6 +14,10 @@ from .cell_utils import (
     NonPeriodicCellTransform,
 )
 
+from .edge_mapper import EdgeMappingTransformer
+
+from .feat_scaler import FeatureScalerTransformer
+
 __all__ = [
     "ChemicalSpeciesToAtomTypeMapper",
     "NeighborListPruneTransform",
@@ -23,4 +27,6 @@ __all__ = [
     "StressSignFlipTransform",
     "AddNaNStressTransform",
     "NonPeriodicCellTransform",
+    "EdgeMappingTransformer",
+    "FeatureScalerTransformer",
 ]

@@ -53,6 +53,10 @@ EDGE_CUTOFF_KEY: Final[str] = "edge_cutoff"
 EDGE_ENERGY_KEY: Final[str] = "edge_energy"
 # edge forces (for LAMMPS MLIAP inference)
 EDGE_FORCE_KEY: Final[str] = "edge_forces"
+#custom descriptor key for edges
+EDGE_DENSITY_KEY: Final[str] = "edge_density"
+EDGE_ELLIPTICITY_KEY: Final[str] = "edge_ellipticity"
+EDGE_SOFTNESS_KEY: Final[str] = "edge_softness"
 
 NODE_FEATURES_KEY: Final[str] = "node_features"
 NODE_ATTRS_KEY: Final[str] = "node_attrs"
@@ -60,6 +64,9 @@ NODE_ATTRS_KEY: Final[str] = "node_attrs"
 FEATURE_NORM_FACTOR_KEY: Final[str] = "feature_norm_factor"
 
 PER_ATOM_ENERGY_KEY: Final[str] = "atomic_energy"
+PER_ATOM_DENSITY_KEY: Final[str] = "density"
+PER_ATOM_LAPLACIAN_KEY: Final[str] = "laplacian"
+PER_ATOM_HESS_EIGEN_KEY: Final[str] = "hess_eigen"
 TOTAL_ENERGY_KEY: Final[str] = "total_energy"
 FORCE_KEY: Final[str] = "forces"
 PARTIAL_FORCE_KEY: Final[str] = "partial_forces"

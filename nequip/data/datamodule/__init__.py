@@ -3,6 +3,7 @@ from ._base_datamodule import NequIPDataModule
 from .sgdml_datamodule import sGDML_CCSD_DataModule
 from ._3bpa_datamodule import NequIP3BPADataModule
 from ._ase_datamodule import ASEDataModule
+from ._asebond_datamodule import ASEBondDataModule
 from .tm23_datamodule import TM23DataModule
 from .rmd17_datamodule import rMD17DataModule
 from .md22_datamodule import MD22DataModule
@@ -18,6 +19,7 @@ __all__ = [
     NequIP3BPADataModule,
     TM23DataModule,
     ASEDataModule,
+    ASEBondDataModule,
     SAMD23DataModule,
     WaterDataModule,
     COLLDataModule,

@@ -12,7 +12,8 @@ from ._key_registry import (
     ABBREV,
 )
 from .dict import from_dict
-from .ase import from_ase, to_ase
+from .ase import from_ase, from_ase_withbond, to_ase
+from .custom_bond_attr import dict_to_edge_attr
 from ._nl import compute_neighborlist_
 from ._sampler import PartialSampler
 from .stats import (
@@ -46,7 +47,9 @@ __all__ = [
     "ABBREV",
     "from_dict",
     "from_ase",
+    "from_ase_withbond",
     "to_ase",
+    "dict_to_edge_attr",
     "compute_neighborlist_",
     "DataStatisticsManager",
     "CommonDataStatisticsManager",

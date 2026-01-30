@@ -43,42 +43,45 @@ def from_dict(data: Dict) -> AtomicDataDict.Type:
 
     # == Deal with _some_ dtype issues ==
     for k, v in data.items():
-        if k in _key_registry._LONG_FIELDS:
-            # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
-            # int32 would pass later checks, but is actually disallowed by torch
-            data[k] = torch.as_tensor(v, dtype=torch.long)
-        elif isinstance(v, bool):
-            data[k] = torch.as_tensor(v)
-        elif isinstance(v, np.ndarray):
-            if np.issubdtype(v.dtype, np.floating):
-                data[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
-            else:
-                data[k] = torch.as_tensor(v)
-        elif isinstance(v, list):
-            ele_dtype = np.array(v).dtype
-            if np.issubdtype(ele_dtype, np.floating):
-                data[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
-            else:
-                data[k] = torch.as_tensor(v)
-        elif np.issubdtype(type(v), np.floating):
-            # Force scalars to be tensors with a data dimension
-            # This makes them play well with irreps
-            data[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
-        elif isinstance(v, torch.Tensor) and len(v.shape) == 0:
-            # ^ this tensor is a scalar; we need to give it
-            # a data dimension to play nice with irreps
-            data[k] = v
-        elif isinstance(v, torch.Tensor):
-            # This is a tensor, so we just don't do anything except avoid the warning in the `else`
+        if type(v) == dict:
             pass
         else:
-            # Guerantee all values are torch.Tensors
-            raise TypeError(
-                f"Value for field {k} was of unsupported type {type(v)} (value was {v})"
-            )
+            if k in _key_registry._LONG_FIELDS:
+                # Any property used as an index must be long (or byte or bool, but those are not relevant for atomic scale systems)
+                # int32 would pass later checks, but is actually disallowed by torch
+                data[k] = torch.as_tensor(v, dtype=torch.long)
+            elif isinstance(v, bool):
+                data[k] = torch.as_tensor(v)
+            elif isinstance(v, np.ndarray):
+                if np.issubdtype(v.dtype, np.floating):
+                    data[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+                else:
+                    data[k] = torch.as_tensor(v)
+            elif isinstance(v, list):
+                ele_dtype = np.array(v).dtype
+                if np.issubdtype(ele_dtype, np.floating):
+                    data[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+                else:
+                    data[k] = torch.as_tensor(v)
+            elif np.issubdtype(type(v), np.floating):
+                # Force scalars to be tensors with a data dimension
+                # This makes them play well with irreps
+                data[k] = torch.as_tensor(v, dtype=torch.get_default_dtype())
+            elif isinstance(v, torch.Tensor) and len(v.shape) == 0:
+                # ^ this tensor is a scalar; we need to give it
+                # a data dimension to play nice with irreps
+                data[k] = v
+            elif isinstance(v, torch.Tensor):
+                # This is a tensor, so we just don't do anything except avoid the warning in the `else`
+                pass
+            else:
+                # Guerantee all values are torch.Tensors
+                raise TypeError(
+                    f"Value for field {k} was of unsupported type {type(v)} (value was {v})"
+                )
 
-        # make sure evrything is contiguous
-        data[k] = data[k].contiguous()
+            # make sure evrything is contiguous
+            data[k] = data[k].contiguous()
 
     # == get useful data properties ==
     if AtomicDataDict.NUM_NODES_KEY in data:
@@ -116,41 +119,44 @@ def from_dict(data: Dict) -> AtomicDataDict.Type:
 
     # == general shape checks ==
     for k, v in data.items():
-        if len(v.shape) == 0:
-            data[k] = v.unsqueeze(-1)
-            v = data[k]
+        if type(v) == dict:
+            pass
+        else:
+            if len(v.shape) == 0:
+                data[k] = v.unsqueeze(-1)
+                v = data[k]
 
-        if k in _key_registry._GRAPH_FIELDS:
-            assert v.shape[0] == N_frames, (
-                f"Leading dimension of registered graph field {k} should be {N_frames}, but found shape {v.shape}."
-            )
-
-            # NOTE: special tensors that we keep as (num_frames,)
-            if v.dim() == 1 and k not in [AtomicDataDict.NUM_NODES_KEY]:
-                data[k] = v.reshape((N_frames, 1))
-
-        elif k in _key_registry._NODE_FIELDS:
-            assert v.shape[0] == N_nodes, (
-                f"Leading dimension of registered node field {k} should be {N_nodes}, but found shape {v.shape}."
-            )
-
-            # NOTE: special tensors that we keep as (num_nodes,)
-            if v.dim() == 1 and k not in [
-                AtomicDataDict.BATCH_KEY,
-                AtomicDataDict.ATOMIC_NUMBERS_KEY,
-                AtomicDataDict.ATOM_TYPE_KEY,
-            ]:
-                data[k] = v.reshape((N_nodes, 1))
-
-        elif k in _key_registry._EDGE_FIELDS:
-            if N_edges is None:
-                raise ValueError(
-                    f"Inconsistent data -- {k} was registered as an edge field, but no edge indices found."
+            if k in _key_registry._GRAPH_FIELDS:
+                assert v.shape[0] == N_frames, (
+                    f"Leading dimension of registered graph field {k} should be {N_frames}, but found shape {v.shape}."
                 )
-            else:
-                assert v.shape[0] == N_edges, (
-                    f"Leading dimension of registered edge field {k} should be {N_edges}, but found shape {v.shape}."
+
+                # NOTE: special tensors that we keep as (num_frames,)
+                if v.dim() == 1 and k not in [AtomicDataDict.NUM_NODES_KEY]:
+                    data[k] = v.reshape((N_frames, 1))
+
+            elif k in _key_registry._NODE_FIELDS:
+                assert v.shape[0] == N_nodes, (
+                    f"Leading dimension of registered node field {k} should be {N_nodes}, but found shape {v.shape}."
                 )
+
+                # NOTE: special tensors that we keep as (num_nodes,)
+                if v.dim() == 1 and k not in [
+                    AtomicDataDict.BATCH_KEY,
+                    AtomicDataDict.ATOMIC_NUMBERS_KEY,
+                    AtomicDataDict.ATOM_TYPE_KEY,
+                ]:
+                    data[k] = v.reshape((N_nodes, 1))
+
+            elif k in _key_registry._EDGE_FIELDS:
+                if N_edges is None:
+                    raise ValueError(
+                        f"Inconsistent data -- {k} was registered as an edge field, but no edge indices found."
+                    )
+                else:
+                    assert v.shape[0] == N_edges, (
+                        f"Leading dimension of registered edge field {k} should be {N_edges}, but found shape {v.shape}."
+                    )
 
     # == specific checks for basic properties (pos, cell) ==
     pos = data[AtomicDataDict.POSITIONS_KEY]

@@ -2,6 +2,7 @@
 from .base_datasets import AtomicDataset
 from .lmdb_dataset import NequIPLMDBDataset
 from .ase_dataset import ASEDataset
+from .ase_bondcp_dataset import ASEBondDataset
 from .npz_dataset import NPZDataset
 from .hdf5_dataset import HDF5Dataset
 from .test_data import EMTTestDataset, LMDBTestDataset
@@ -12,6 +13,7 @@ __all__ = [
     "AtomicDataset",
     "NequIPLMDBDataset",
     "ASEDataset",
+    ASEBondDataset,
     "NPZDataset",
     "HDF5Dataset",
     "EMTTestDataset",
