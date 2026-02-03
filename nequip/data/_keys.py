@@ -57,6 +57,8 @@ EDGE_FORCE_KEY: Final[str] = "edge_forces"
 EDGE_DENSITY_KEY: Final[str] = "edge_density"
 EDGE_ELLIPTICITY_KEY: Final[str] = "edge_ellipticity"
 EDGE_SOFTNESS_KEY: Final[str] = "edge_softness"
+# one-hot encoding of whether custom feat was provided for each edge
+EDGE_CUSTOM_ENCODE_KEY: Final[str] = "edge_custom_encode"
 
 NODE_FEATURES_KEY: Final[str] = "node_features"
 NODE_ATTRS_KEY: Final[str] = "node_attrs"

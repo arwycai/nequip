@@ -8,7 +8,7 @@ from ._edge import (
     AddRadialCutoffToData,
 )
 from .cutoffs import PolynomialCutoff
-from .edge_type_embed import EdgeTypeEmbed
+from .edge_type_embed import EdgeTypeEmbed, EdgeFeatMerge
 
 __all__ = [
     NodeTypeEmbed,
@@ -19,4 +19,5 @@ __all__ = [
     AddRadialCutoffToData,
     PolynomialCutoff,
     EdgeTypeEmbed,
+    EdgeFeatMerge,
 ]
