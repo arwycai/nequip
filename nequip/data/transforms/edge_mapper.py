@@ -38,5 +38,6 @@ class EdgeMappingTransformer(torch.nn.Module):
                 one_hot_list.append(0)
 
         data[self.key_name] = torch.tensor(attr_list).contiguous()
-        
+        data[self.custom_onehot] = torch.tensor(one_hot_list).contiguous()
+
         return data

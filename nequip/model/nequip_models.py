@@ -391,23 +391,23 @@ def FullNequIPGNNModel(
         prev_irreps_out = atomic_custom_readout.irreps_out
 
     if edge_custom_key is not None:
-        edge_merge = EdgeFeatMerge(
-            field_list=[AtomicDataDict.EDGE_FEATURES_KEY,AtomicDataDict.EDGE_CUSTOM_ENCODE_KEY],
-            out_field=AtomicDataDict.EDGE_FEATURES_KEY,
-            irreps_in=prev_irreps_out
-        )
+        # edge_merge = EdgeFeatMerge(
+        #     field_list=[AtomicDataDict.EDGE_FEATURES_KEY, AtomicDataDict.EDGE_CUSTOM_ENCODE_KEY],
+        #     out_field=AtomicDataDict.EDGE_FEATURES_KEY,
+        #     irreps_in=prev_irreps_out,
+        # )
         edge_custom_readout = ScalarMLP(
             output_dim=1,
             bias=False,
             forward_weight_init=True,
             field=AtomicDataDict.EDGE_FEATURES_KEY,
             out_field=edge_custom_key,
-            irreps_in=edge_merge.irreps_out,
+            irreps_in=prev_irreps_out,
         )
         
         modules.update(
         {
-            "edge_merge": edge_merge,
+            # "edge_merge": edge_merge,
             "edge_custom_readout": edge_custom_readout,
         }
         )

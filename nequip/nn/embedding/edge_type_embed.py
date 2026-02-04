@@ -67,11 +67,8 @@ class EdgeTypeEmbed(GraphModuleMixin, torch.nn.Module):
         return data
 
 class EdgeFeatMerge(GraphModuleMixin, torch.nn.Module):
-    """Generates node type embeddings.
-
-    Args:
-        type_names (List[str]): list of type names for atoms
-        num_features (int): embedding dimension
+    """
+    # TODO
     """
 
     num_types: int
@@ -89,7 +86,7 @@ class EdgeFeatMerge(GraphModuleMixin, torch.nn.Module):
 
         num_irreps=0
         for f in field_list:
-            n_ir = self.irreps_in[f].num_irreps
+            n_ir = irreps_in[f].num_irreps
             num_irreps += n_ir
 
         self._init_irreps(irreps_in=irreps_in, irreps_out={self.out_field:Irreps([(num_irreps, (0, 1))])})
@@ -97,5 +94,5 @@ class EdgeFeatMerge(GraphModuleMixin, torch.nn.Module):
     def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
         field_tmp=[data[f] for f in self.field_list]
         data[self.out_field]=torch.cat(field_tmp,1)
-        
+
         return data
